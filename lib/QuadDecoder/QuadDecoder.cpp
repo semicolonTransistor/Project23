@@ -37,14 +37,12 @@ void QuadDecoder::processDecoder(){
 	}
   lastEncoderLowBits = encoderLowBits;
 
-  pastEncoderCounts[pastEncoderCountsIndex] = getCount();
-  pastEncoderCountsIndex ++;
+  velocityModule.addPositionSample(getCount());
 }
 
 int32_t QuadDecoder::getVelocity(){
   noInterrupts();
-  uint8_t pastIndex = pastEncoderCountsIndex - 101;
-  int32_t velocity = pastEncoderCounts[pastEncoderCountsIndex-1] - pastEncoderCounts[pastIndex];
+  int32_t velocity = velocityModule.getVelocity();
   interrupts();
   return velocity;
 }

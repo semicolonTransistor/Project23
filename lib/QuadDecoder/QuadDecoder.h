@@ -2,6 +2,7 @@
 #define QUAD_DECODER_H
 
 #include <Arduino.h>
+#include "VelocityModule.h"
 
 class QuadDecoder{
 public:
@@ -12,8 +13,7 @@ public:
 private:
   int32_t encoderHighBits = 0;
   uint16_t lastEncoderLowBits = 0;
-  int32_t pastEncoderCounts [256] = {};
-  uint8_t pastEncoderCountsIndex = 0;
+  VelocityModule velocityModule;
 };
 
 extern QuadDecoder quadDecoder;
