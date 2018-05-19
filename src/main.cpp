@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <QuadDecoder.h>
+#include <AnalogEncoder.h>
 
 #include <SPI.h>
 #include "SH1106_SPI.h"
@@ -18,6 +19,7 @@ uint32_t time = 0;
 
 void tick(){
 	quadDecoder.processDecoder();
+	analogEncoder.processAnalogEncoder();
 }
 
 void setup(void)
@@ -25,6 +27,7 @@ void setup(void)
 	Serial.begin(115200);
 	lcd.begin(false,true);
 	quadDecoder.begin();
+	analogEncoder.begin();
 	Timer3.setPeriod(1000);
 	Timer3.setChannel1Mode(TIMER_OUTPUT_COMPARE);
 	Timer3.setCompare1(1);
