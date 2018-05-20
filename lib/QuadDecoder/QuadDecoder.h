@@ -8,6 +8,7 @@ class QuadDecoder{
 public:
   void begin();
   void processDecoder();
+  void reset();
   int32_t getCount();
   int32_t getVelocity();
 private:

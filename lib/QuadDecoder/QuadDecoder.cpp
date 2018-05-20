@@ -47,4 +47,12 @@ int32_t QuadDecoder::getVelocity(){
   return velocity;
 }
 
+void QuadDecoder::reset(){
+  noInterrupts();
+  encoderHighBits = 0;
+  lastEncoderLowBits = 0;
+  TIMER1->regs.bas->CNT = 0;
+  interrupts();
+}
+
 QuadDecoder quadDecoder;

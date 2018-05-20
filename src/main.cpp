@@ -21,18 +21,23 @@ uint32_t lastUpdate = 0;
 uint32_t time = 0;
 uint8_t state = 0;
 
+void indexHandler(){
+	quadDecoder.reset();
+}
+
 void tick(){
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
-	digitalWrite(PC13,digitalRead(PA15));
 }
 
 void setup(void)
 {
 	Serial.begin(115200);
 	lcd.begin(false,true);
-	pinMode(PC13,OUTPUT);
 	pinMode(PA15,INPUT_PULLUP);
+	pinMode(PA10,INPUT_PULLUP);
+
+	attachInterrupt(PA10, indexHandler, FALLING);
 
 	debouncer.attach(PA15);
 	debouncer.interval(10);
