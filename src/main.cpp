@@ -8,8 +8,6 @@
 #include <SPI.h>
 #include "SH1106_SPI.h"
 
-#define TIME_OUT 30000
-
 #define USE_FRAME_BUFFER
 
 #ifdef USE_FRAME_BUFFER
@@ -18,11 +16,12 @@ SH1106_SPI_FB lcd;
 SH1106_SPI lcd;
 #endif
 
-Bounce debouncer = Bounce();
+Bounce UIBtnDebouncer = Bounce();
+Bounce PwrBtnDebouncer = Bounce();
 
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
-uint32_t lastUpdate = 0;
+uint32_t lastPwrBtnUp = 0;
 uint32_t displayTime = 0;
 uint8_t state = 0;
 
@@ -68,14 +67,17 @@ void setup(void)	{
 
 	//config pins
 	PWR_BASE->CSR &= (~PWR_CSR_EWUP); //disables WKUP pin and returns PA0 to GPIO
-	pinMode(UI_BUTTON,INPUT_PULLUP);
+	pinMode(UI_BUTTON,INPUT_PULLDOWN);
+	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
 	pinMode(PA10,INPUT_PULLUP);
 
 	//config exteral interrupts
 	attachInterrupt(PA10, indexHandler, FALLING);
 
-	debouncer.attach(UI_BUTTON);
-	debouncer.interval(10);
+	UIBtnDebouncer.attach(UI_BUTTON);
+	UIBtnDebouncer.interval(10);
+	PwrBtnDebouncer.attach(PWR_BUTTON);
+	PwrBtnDebouncer.interval(10);
 	quadDecoder.begin();
 	analogEncoder.begin();
 
@@ -124,13 +126,26 @@ void loop(void){
 		lcd.renderAll();
 		displayTime = micros() - dispStart;
 	}
-	debouncer.update();
-	if(debouncer.fallingEdge()){
+
+	UIBtnDebouncer.update();
+	PwrBtnDebouncer.update();
+
+	//ui buttton
+	if(UIBtnDebouncer.rose()){
 		state++;
 		lastActivity = millis();
 		if(state > 1){
 			state = 0;
 		}
+	}
+
+	//pwr button
+	if(PwrBtnDebouncer.fell() && (millis() - lastPwrBtnUp) > POWER_DOWN_MIN_DUR){
+		shutdown();
+	}
+
+	if(PwrBtnDebouncer.read() == LOW){
+		lastPwrBtnUp = millis();
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){

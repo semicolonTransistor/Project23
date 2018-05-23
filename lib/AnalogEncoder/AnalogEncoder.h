@@ -11,7 +11,7 @@ public:
   int32_t getCount();
   int32_t getVelocity();
 private:
-  const int analogPin = PA0;
+  const int analogPin = PA1;
   VelocityModule velocityModule;
   uint16_t lastEncoderLowBits = 0;
   int32_t encoderHighBits = 0;
