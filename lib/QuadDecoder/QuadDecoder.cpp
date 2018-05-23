@@ -2,8 +2,8 @@
 
 void QuadDecoder::begin(){
   //init encoder pins.
-  pinMode(PA8,INPUT_PULLUP);
-  pinMode(PA9,INPUT_PULLUP);
+  pinMode(CH_A,INPUT_PULLUP);
+  pinMode(CH_B,INPUT_PULLUP);
 
   //register poking, setting up timer 1 in encoder mode
   TIMER1->regs.bas->CR1 = 0x0000;

@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include "VelocityModule.h"
 
+#define CH_A PA8
+#define CH_B PA9
+
 class QuadDecoder{
 public:
   void begin();
