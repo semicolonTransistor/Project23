@@ -61,18 +61,26 @@ void shutdown(){
 }
 
 void setup(void)	{
-	//setup display and Serial
-	Serial.begin(115200);
-	lcd.begin(false,true);
 
 	//config pins
 	PWR_BASE->CSR &= (~PWR_CSR_EWUP); //disables WKUP pin and returns PA0 to GPIO
 	pinMode(UI_BUTTON,INPUT_PULLDOWN);
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
-	pinMode(PA10,INPUT_PULLUP);
+	pinMode(INDEX,INPUT_PULLUP);
+	pinMode(OLED_ENABLE,OUTPUT);
+	pinMode(USB_PULLUP, OUTPUT);
+	pinMode(PWR_LED,OUTPUT);
+
+	digitalWrite(OLED_ENABLE, LOW);
+	digitalWrite(USB_PULLUP, HIGH);
+	digitalWrite(PWR_LED,LOW);
 
 	//config exteral interrupts
-	attachInterrupt(PA10, indexHandler, FALLING);
+	//attachInterrupt(PA10, indexHandler, FALLING
+
+	//setup display and Serial
+	Serial.begin(115200);
+	lcd.begin(false,true);
 
 	UIBtnDebouncer.attach(UI_BUTTON);
 	UIBtnDebouncer.interval(10);
