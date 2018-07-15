@@ -16,8 +16,9 @@ SH1106_SPI_FB lcd;
 SH1106_SPI lcd;
 #endif
 
-Bounce UIBtnDebouncer = Bounce();
-Bounce PwrBtnDebouncer = Bounce();
+Bounce UIBtn = Bounce();
+Bounce PwrBtn = Bounce();
+Bounce VBusSense = Bounce();
 
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
@@ -67,13 +68,17 @@ void setup(void)	{
 	pinMode(UI_BUTTON,INPUT_PULLDOWN);
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
 	pinMode(INDEX,INPUT_PULLUP);
+	pinMode(VBUS_SENSE, INPUT_PULLDOWN);
+
 	pinMode(OLED_ENABLE,OUTPUT);
 	pinMode(USB_PULLUP, OUTPUT);
 	pinMode(PWR_LED,OUTPUT);
+	pinMode(BOOST_EN,OUTPUT);
 
 	digitalWrite(OLED_ENABLE, LOW);
-	digitalWrite(USB_PULLUP, HIGH);
+	digitalWrite(USB_PULLUP, LOW);
 	digitalWrite(PWR_LED,LOW);
+	digitalWrite(BOOST_EN,LOW);
 
 	//config exteral interrupts
 	//attachInterrupt(PA10, indexHandler, FALLING
@@ -82,10 +87,13 @@ void setup(void)	{
 	Serial.begin(115200);
 	lcd.begin(false,true);
 
-	UIBtnDebouncer.attach(UI_BUTTON);
-	UIBtnDebouncer.interval(10);
-	PwrBtnDebouncer.attach(PWR_BUTTON);
-	PwrBtnDebouncer.interval(10);
+	UIBtn.attach(UI_BUTTON);
+	UIBtn.interval(10);
+	PwrBtn.attach(PWR_BUTTON);
+	PwrBtn.interval(10);
+	VBusSense.attach(VBUS_SENSE);
+	VBusSense.interval(100);
+
 	quadDecoder.begin();
 	analogEncoder.begin();
 
@@ -119,6 +127,18 @@ void loop(void){
 			lcd.renderString(0,2,len);
 			break;
 			case 1:
+			len += lcd.print("Encoder:");
+			lcd.renderString(0,0,len);
+			len = 0;
+			len += lcd.print((float)(quadDecoder.getCount())/11.37);
+			len += lcd.print(F("deg"));
+			lcd.renderString(0,1,len);
+			len = 0;
+			len += lcd.print((float)(quadDecoder.getVelocity())/409.6);
+			len += lcd.print(F("rpm"));
+			lcd.renderString(0,2,len);
+			break;
+			case 2:
 			len += lcd.print("Analog:");
 			lcd.renderString(0,0,len);
 			len = 0;
@@ -135,25 +155,46 @@ void loop(void){
 		displayTime = micros() - dispStart;
 	}
 
-	UIBtnDebouncer.update();
-	PwrBtnDebouncer.update();
+	UIBtn.update();
+	PwrBtn.update();
+	VBusSense.update();
 
 	//ui buttton
-	if(UIBtnDebouncer.rose()){
+	if(UIBtn.rose()){
 		state++;
 		lastActivity = millis();
-		if(state > 1){
+		if(state > 2){
 			state = 0;
 		}
 	}
 
 	//pwr button
-	if(PwrBtnDebouncer.fell() && (millis() - lastPwrBtnUp) > POWER_DOWN_MIN_DUR){
-		shutdown();
+	if(PwrBtn.fell()){
+		if((millis() - lastPwrBtnUp) > POWER_DOWN_MIN_DUR){
+			shutdown();
+		}else{
+			switch(state){
+				case 0:
+				case 1:
+				quadDecoder.reset();
+				break;
+				case 2:
+				analogEncoder.reset();
+
+			}
+		}
 	}
 
-	if(PwrBtnDebouncer.read() == LOW){
+	if(PwrBtn.read() == LOW){
 		lastPwrBtnUp = millis();
+	}
+
+	if(VBusSense.read() == HIGH){
+		digitalWrite(BOOST_EN, LOW);
+		digitalWrite(USB_PULLUP,HIGH);
+	}else{
+		digitalWrite(BOOST_EN, HIGH);
+		digitalWrite(USB_PULLUP,LOW);
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){

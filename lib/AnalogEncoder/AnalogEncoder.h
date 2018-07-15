@@ -10,6 +10,7 @@ public:
   void processAnalogEncoder();
   int32_t getCount();
   int32_t getVelocity();
+  void reset();
 private:
   const int analogPin = PA1;
   VelocityModule velocityModule;

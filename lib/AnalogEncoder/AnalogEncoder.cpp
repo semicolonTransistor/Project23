@@ -32,4 +32,8 @@ int32_t AnalogEncoder::getVelocity(){
   return velocity;
 }
 
+void AnalogEncoder::reset(){
+  encoderHighBits = 0;
+}
+
 AnalogEncoder analogEncoder;
