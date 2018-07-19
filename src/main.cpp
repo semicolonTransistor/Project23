@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "Config.h"
 #include <QuadDecoder.h>
 #include <AnalogEncoder.h>
 #include <Bounce2.h>
@@ -7,6 +6,8 @@
 
 #include <SPI.h>
 #include "SH1106_SPI.h"
+#include "hardware.h"
+#include "CLI.h"
 
 #define USE_FRAME_BUFFER
 
@@ -85,6 +86,7 @@ void setup(void)	{
 
 	//setup display and Serial
 	Serial.begin(115200);
+	CLI_Init();
 	lcd.begin(false,true);
 
 	UIBtn.attach(UI_BUTTON);
@@ -153,6 +155,17 @@ void loop(void){
 		}
 		lcd.renderAll();
 		displayTime = micros() - dispStart;
+		if(CLI_Stream){
+			Serial.print(quadDecoder.getCount());
+			Serial.print(",");
+			Serial.print(quadDecoder.getVelocity());
+			Serial.print(",");
+			Serial.print(analogEncoder.getCount());
+			Serial.print(",");
+			Serial.print(quadDecoder.getVelocity());
+			Serial.println();
+			lastActivity = millis();
+		}
 	}
 
 	UIBtn.update();
@@ -200,4 +213,7 @@ void loop(void){
 	if((millis()-lastActivity) > TIME_OUT){
 		shutdown();
 	}
+
+	CLI_Update();
+
 }
