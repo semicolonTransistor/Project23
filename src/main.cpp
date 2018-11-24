@@ -5,17 +5,13 @@
 #include <STM32sleep.h>
 
 #include <SPI.h>
-#include "SH1106_SPI.h"
 #include "hardware.h"
+#include <U8g2lib.h>
 #include "CLI.h"
 
 #define USE_FRAME_BUFFER
 
-#ifdef USE_FRAME_BUFFER
-SH1106_SPI_FB lcd;
-#else
-SH1106_SPI lcd;
-#endif
+U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET);
 
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
@@ -24,7 +20,7 @@ Bounce VBusSense = Bounce();
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
 uint32_t lastPwrBtnUp = 0;
-uint32_t displayTime = 0;
+uint32_t lastSensorRead = 0;
 uint8_t state = 0;
 
 void indexHandler(){
@@ -34,20 +30,15 @@ void indexHandler(){
 void tick(){
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
+
 }
 
 //shut everything down and prepare for sleep.
 void shutdown(){
 	//clears and shuts down the oled
-	lcd.clear(true);
-	digitalWrite(PIN_RESET,LOW);
-	digitalWrite(PIN_CS, LOW);
 
 	//removes external interrupts
 	detachInterrupt(PA10);
-
-	//stops tick timer
-	Timer3.pause();
 
 	//shuts down the rest of the stm32
 	adc_disable_all();
@@ -86,8 +77,9 @@ void setup(void)	{
 
 	//setup display and Serial
 	Serial.begin(115200);
+	display.begin();
+	display.setBusClock(40000000UL);
 	CLI_Init();
-	lcd.begin(false,true);
 
 	UIBtn.attach(UI_BUTTON);
 	UIBtn.interval(10);
@@ -98,6 +90,7 @@ void setup(void)	{
 
 	quadDecoder.begin();
 	analogEncoder.begin();
+
 
 	//set up a tick interrupt with a interval of 1 ms.
 	Timer3.setPeriod(1000);
@@ -111,50 +104,42 @@ void setup(void)	{
 
 void loop(void){
 	if(millis()-lastDisplay >= 20){
-		uint32_t dispStart = micros();
-		lcd.clear(false);
 		lastDisplay = millis();
-		int len = 0;
-		switch (state) {
+		switch(state){
+			case 255:
+				display.clearBuffer();
+				display.setFont(u8g2_font_ncenB14_tf);
+				display.drawStr(0,15,"Goldfish");
+				display.drawStr(0,32,"Electronrics");
+				display.setFont(u8g2_font_6x10_tf);
+    		display.drawStr(0,55,"Project 23");
+				display.drawStr(0,63,"Firmware: v0.2.0");
+				break;
 			case 0:
-			len += lcd.print("Encoder:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print(F("Position:"));
-			len += lcd.print(quadDecoder.getCount());
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print(F("Velocity:"));
-			len += lcd.print(quadDecoder.getVelocity());
-			lcd.renderString(0,2,len);
-			break;
+				display.clearBuffer();
+				display.setFont(u8g2_font_timR10_tr);
+				display.setCursor(0, 11);
+				display.print("Quadrature Encoder:");
+				display.setCursor(0,25);
+				display.print("Pos: ");
+				display.setCursor(0,39);
+				display.print("Vel: ");
+				display.print(quadDecoder.getVelocity());
+				break;
 			case 1:
-			len += lcd.print("Encoder:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print((float)(quadDecoder.getCount())/11.37);
-			len += lcd.print(F("deg"));
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print((float)(quadDecoder.getVelocity())/409.6);
-			len += lcd.print(F("rpm"));
-			lcd.renderString(0,2,len);
-			break;
-			case 2:
-			len += lcd.print("Analog:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print(F("Position:"));
-			len += lcd.print(analogEncoder.getCount());
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print(F("Velocity:"));
-			len += lcd.print(analogEncoder.getVelocity());
-			lcd.renderString(0,2,len);
-			break;
+				display.clearBuffer();
+				display.setFont(u8g2_font_timR10_tr);
+				display.setCursor(0, 11);
+				display.print("Analog Encoder:");
+				display.setCursor(0,25);
+				display.print("Pos: ");
+				display.print(analogEncoder.getCount());
+				display.setCursor(0,39);
+				display.print("Vel: ");
+				display.print(analogEncoder.getVelocity());
+				break;
 		}
-		lcd.renderAll();
-		displayTime = micros() - dispStart;
+		display.sendBuffer();
 		if(CLI_Stream){
 			Serial.print(quadDecoder.getCount());
 			Serial.print(",");
@@ -176,7 +161,7 @@ void loop(void){
 	if(UIBtn.rose()){
 		state++;
 		lastActivity = millis();
-		if(state > 2){
+		if(state > 1){
 			state = 0;
 		}
 	}
@@ -198,16 +183,13 @@ void loop(void){
 		}
 	}
 
-	if(PwrBtn.read() == LOW){
-		lastPwrBtnUp = millis();
+	if(millis() - lastSensorRead >= 1){
+		lastSensorRead = millis();
+		//tick();
 	}
 
-	if(VBusSense.read() == HIGH){
-		digitalWrite(BOOST_EN, LOW);
-		digitalWrite(USB_PULLUP,HIGH);
-	}else{
-		digitalWrite(BOOST_EN, HIGH);
-		digitalWrite(USB_PULLUP,LOW);
+	if(PwrBtn.read() == LOW){
+		lastPwrBtnUp = millis();
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){
@@ -215,5 +197,6 @@ void loop(void){
 	}
 
 	CLI_Update();
+	delay(2);
 
 }
