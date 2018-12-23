@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include <QuadDecoder.h>
 #include <AnalogEncoder.h>
+#include <Blinker.h>
 #include <Bounce2.h>
 #include <STM32sleep.h>
 
 #include <SPI.h>
 #include "hardware.h"
+#include "config.h"
 #include <U8g2lib.h>
 #include "CLI.h"
 
@@ -15,7 +17,7 @@ U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET
 
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
-Bounce VBusSense = Bounce();
+Blinker PwrLed = Blinker();
 
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
@@ -60,17 +62,12 @@ void setup(void)	{
 	pinMode(UI_BUTTON,INPUT_PULLDOWN);
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
 	pinMode(INDEX,INPUT_PULLUP);
-	pinMode(VBUS_SENSE, INPUT_PULLDOWN);
+	pinMode(BATT_STAT, INPUT_PULLUP);
 
-	pinMode(OLED_ENABLE,OUTPUT);
-	pinMode(USB_PULLUP, OUTPUT);
+	pinMode(PWR_ENABLE,OUTPUT);
 	pinMode(PWR_LED,OUTPUT);
-	pinMode(BOOST_EN,OUTPUT);
 
-	digitalWrite(OLED_ENABLE, LOW);
-	digitalWrite(USB_PULLUP, LOW);
-	digitalWrite(PWR_LED,LOW);
-	digitalWrite(BOOST_EN,LOW);
+	digitalWrite(PWR_ENABLE, HIGH);
 
 	//config exteral interrupts
 	//attachInterrupt(PA10, indexHandler, FALLING
@@ -85,8 +82,9 @@ void setup(void)	{
 	UIBtn.interval(10);
 	PwrBtn.attach(PWR_BUTTON);
 	PwrBtn.interval(10);
-	VBusSense.attach(VBUS_SENSE);
-	VBusSense.interval(100);
+	PwrLed.attach(PWR_LED);
+	PwrLed.interval(2000);
+	PwrLed.set(BlinkerMode::On);
 
 	quadDecoder.begin();
 	analogEncoder.begin();
@@ -155,7 +153,6 @@ void loop(void){
 
 	UIBtn.update();
 	PwrBtn.update();
-	VBusSense.update();
 
 	//ui buttton
 	if(UIBtn.rose()){
@@ -190,6 +187,12 @@ void loop(void){
 
 	if(PwrBtn.read() == LOW){
 		lastPwrBtnUp = millis();
+	}
+
+	if(digitalRead(BATT_STAT) == LOW){
+		PwrLed.set(BlinkerMode::Blinking);
+	}else{
+		PwrLed.set(BlinkerMode::On);
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){
