@@ -11,20 +11,27 @@ void Blinker::interval(uint32_t period){
 
 void Blinker::set(BlinkerMode mode){
   this->mode = mode;
-  lastChange = millis();
 }
 
 void Blinker::update(){
   switch (mode) {
     case On:
     digitalWrite(pin, LOW);
+    state = LOW;
     break;
     case Off:
     digitalWrite(pin, HIGH);
+    state = HIGH;
     break;
     case Blinking:
     if(millis() - lastChange > halfPeriod){
-      digitalWrite(pin, ~digitalRead(pin));
+      if(state == LOW){
+        digitalWrite(pin, HIGH);
+        state = HIGH;
+      }else{
+        digitalWrite(pin, LOW);
+        state = LOW;
+      }
       lastChange = millis();
     }
   }

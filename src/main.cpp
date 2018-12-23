@@ -63,11 +63,16 @@ void setup(void)	{
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
 	pinMode(INDEX,INPUT_PULLUP);
 	pinMode(BATT_STAT, INPUT_PULLUP);
+	pinMode(R_DIV_ENABLE, OUTPUT);
 
 	pinMode(PWR_ENABLE,OUTPUT);
 	pinMode(PWR_LED,OUTPUT);
 
+	pinMode(BATT_MON, INPUT_ANALOG);
+	pinMode(VBUS_MON, INPUT_ANALOG);
+
 	digitalWrite(PWR_ENABLE, HIGH);
+	digitalWrite(R_DIV_ENABLE, LOW);
 
 	//config exteral interrupts
 	//attachInterrupt(PA10, indexHandler, FALLING
@@ -83,7 +88,7 @@ void setup(void)	{
 	PwrBtn.attach(PWR_BUTTON);
 	PwrBtn.interval(10);
 	PwrLed.attach(PWR_LED);
-	PwrLed.interval(2000);
+	PwrLed.interval(1000);
 	PwrLed.set(BlinkerMode::On);
 
 	quadDecoder.begin();
@@ -91,12 +96,12 @@ void setup(void)	{
 
 
 	//set up a tick interrupt with a interval of 1 ms.
-	Timer3.setPeriod(1000);
-	Timer3.setChannel1Mode(TIMER_OUTPUT_COMPARE);
-	Timer3.setCompare1(1);
-	Timer3.attachCompare1Interrupt(tick);
-	Timer3.refresh();
-	Timer3.resume();
+	Timer2.setPeriod(1000);
+	Timer2.setChannel1Mode(TIMER_OUTPUT_COMPARE);
+	Timer2.setCompare1(1);
+	Timer2.attachCompare1Interrupt(tick);
+	Timer2.refresh();
+	Timer2.resume();
 
 }
 
@@ -111,7 +116,7 @@ void loop(void){
 				display.drawStr(0,32,"Electronrics");
 				display.setFont(u8g2_font_6x10_tf);
     		display.drawStr(0,55,"Project 23");
-				display.drawStr(0,63,"Firmware: v0.2.0");
+				display.drawStr(0,63,"Firmware: v0.0.0");
 				break;
 			case 0:
 				display.clearBuffer();
@@ -120,6 +125,7 @@ void loop(void){
 				display.print("Quadrature Encoder:");
 				display.setCursor(0,25);
 				display.print("Pos: ");
+				display.print(quadDecoder.getCount());
 				display.setCursor(0,39);
 				display.print("Vel: ");
 				display.print(quadDecoder.getVelocity());
@@ -153,6 +159,7 @@ void loop(void){
 
 	UIBtn.update();
 	PwrBtn.update();
+	PwrLed.update();
 
 	//ui buttton
 	if(UIBtn.rose()){

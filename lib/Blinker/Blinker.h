@@ -10,6 +10,7 @@ protected:
   uint32_t halfPeriod = 0;
   uint32_t lastChange = 0;
   int pin;
+  int state = LOW;
   BlinkerMode mode = Off;
 public:
   void attach(int pinNumber);
