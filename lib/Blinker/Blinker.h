@@ -16,6 +16,7 @@ public:
   void attach(int pinNumber);
   void set(BlinkerMode mode);
   void interval(uint32_t period);
+  void toggle();
   void update();
 
 

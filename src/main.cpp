@@ -17,7 +17,10 @@ U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET
 
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
-Blinker PwrLed = Blinker();
+
+Blinker pwrLed = Blinker();
+Blinker fwdLed = Blinker();
+Blinker revLed = Blinker();
 
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
@@ -65,8 +68,10 @@ void setup(void)	{
 	pinMode(BATT_STAT, INPUT_PULLUP);
 	pinMode(R_DIV_ENABLE, OUTPUT);
 
-	pinMode(PWR_ENABLE,OUTPUT);
-	pinMode(PWR_LED,OUTPUT);
+	pinMode(PWR_ENABLE, OUTPUT);
+	pinMode(PWR_LED, OUTPUT);
+	pinMode(FWD_LED, OUTPUT);
+	pinMode(REV_LED, OUTPUT);
 
 	pinMode(BATT_MON, INPUT_ANALOG);
 	pinMode(VBUS_MON, INPUT_ANALOG);
@@ -87,21 +92,31 @@ void setup(void)	{
 	UIBtn.interval(10);
 	PwrBtn.attach(PWR_BUTTON);
 	PwrBtn.interval(10);
-	PwrLed.attach(PWR_LED);
-	PwrLed.interval(1000);
-	PwrLed.set(BlinkerMode::On);
+
+	pwrLed.attach(PWR_LED);
+	pwrLed.interval(1000);
+	pwrLed.set(BlinkerMode::On);
+
+	fwdLed.attach(FWD_LED);
+	fwdLed.interval(1000);
+	fwdLed.set(BlinkerMode::On);
+
+	revLed.attach(REV_LED);
+	revLed.interval(1000);
+	revLed.set(BlinkerMode::On);
 
 	quadDecoder.begin();
 	analogEncoder.begin();
 
 
 	//set up a tick interrupt with a interval of 1 ms.
-	Timer2.setPeriod(1000);
-	Timer2.setChannel1Mode(TIMER_OUTPUT_COMPARE);
-	Timer2.setCompare1(1);
-	Timer2.attachCompare1Interrupt(tick);
-	Timer2.refresh();
-	Timer2.resume();
+	timer_init(TIMER3);
+	timer_set_prescaler(TIMER3, 1);
+	timer_set_reload(TIMER3, 36000);
+	timer_attach_interrupt(TIMER3, TIMER_UPDATE_INTERRUPT, tick);
+	timer_generate_update(TIMER3);
+	timer_resume(TIMER3);
+
 
 }
 
@@ -159,7 +174,7 @@ void loop(void){
 
 	UIBtn.update();
 	PwrBtn.update();
-	PwrLed.update();
+	pwrLed.update();
 
 	//ui buttton
 	if(UIBtn.rose()){
@@ -197,9 +212,9 @@ void loop(void){
 	}
 
 	if(digitalRead(BATT_STAT) == LOW){
-		PwrLed.set(BlinkerMode::Blinking);
+		pwrLed.set(BlinkerMode::Blinking);
 	}else{
-		PwrLed.set(BlinkerMode::On);
+		pwrLed.set(BlinkerMode::On);
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){

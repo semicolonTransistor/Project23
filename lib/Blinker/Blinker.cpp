@@ -13,6 +13,16 @@ void Blinker::set(BlinkerMode mode){
   this->mode = mode;
 }
 
+void Blinker::toggle(){
+  if(state == LOW){
+    digitalWrite(pin, HIGH);
+    state = HIGH;
+  }else{
+    digitalWrite(pin, LOW);
+    state = LOW;
+  }
+}
+
 void Blinker::update(){
   switch (mode) {
     case On:
@@ -25,13 +35,7 @@ void Blinker::update(){
     break;
     case Blinking:
     if(millis() - lastChange > halfPeriod){
-      if(state == LOW){
-        digitalWrite(pin, HIGH);
-        state = HIGH;
-      }else{
-        digitalWrite(pin, LOW);
-        state = LOW;
-      }
+      toggle();
       lastChange = millis();
     }
   }
