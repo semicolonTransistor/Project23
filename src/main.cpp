@@ -8,6 +8,7 @@
 #include <SPI.h>
 #include "hardware.h"
 #include "config.h"
+#include "bitmaps.h"
 #include <U8g2lib.h>
 #include "CLI.h"
 
@@ -17,6 +18,8 @@ U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET
 
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
+Bounce RevLimit = Bounce();
+Bounce FwdLimit = Bounce();
 
 Blinker pwrLed = Blinker();
 Blinker fwdLed = Blinker();
@@ -25,8 +28,9 @@ Blinker revLed = Blinker();
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
 uint32_t lastPwrBtnUp = 0;
-uint32_t lastSensorRead = 0;
-uint8_t state = 0;
+uint8_t state = 255;
+
+uint16_t battVoltsRaw = 0;
 
 void indexHandler(){
 	quadDecoder.reset();
@@ -35,7 +39,7 @@ void indexHandler(){
 void tick(){
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
-
+	battVoltsRaw = analogRead(BATT_MON);
 }
 
 //shut everything down and prepare for sleep.
@@ -64,11 +68,14 @@ void setup(void)	{
 	PWR_BASE->CSR &= (~PWR_CSR_EWUP); //disables WKUP pin and returns PA0 to GPIO
 	pinMode(UI_BUTTON,INPUT_PULLDOWN);
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
-	pinMode(INDEX,INPUT_PULLUP);
 	pinMode(BATT_STAT, INPUT_PULLUP);
-	pinMode(R_DIV_ENABLE, OUTPUT);
+
+	pinMode(INDEX,INPUT_PULLUP);
+	pinMode(FWD_LIMIT, INPUT);
+	pinMode(REV_LIMIT, INPUT);
 
 	pinMode(PWR_ENABLE, OUTPUT);
+	pinMode(R_DIV_ENABLE, OUTPUT);
 	pinMode(PWR_LED, OUTPUT);
 	pinMode(FWD_LED, OUTPUT);
 	pinMode(REV_LED, OUTPUT);
@@ -90,8 +97,15 @@ void setup(void)	{
 
 	UIBtn.attach(UI_BUTTON);
 	UIBtn.interval(10);
+
 	PwrBtn.attach(PWR_BUTTON);
 	PwrBtn.interval(10);
+
+	FwdLimit.attach(FWD_LIMIT);
+	FwdLimit.interval(10);
+
+	RevLimit.attach(REV_LIMIT);
+	RevLimit.attach(10);
 
 	pwrLed.attach(PWR_LED);
 	pwrLed.interval(1000);
@@ -99,11 +113,9 @@ void setup(void)	{
 
 	fwdLed.attach(FWD_LED);
 	fwdLed.interval(1000);
-	fwdLed.set(BlinkerMode::On);
 
 	revLed.attach(REV_LED);
 	revLed.interval(1000);
-	revLed.set(BlinkerMode::On);
 
 	quadDecoder.begin();
 	analogEncoder.begin();
@@ -123,37 +135,44 @@ void setup(void)	{
 void loop(void){
 	if(millis()-lastDisplay >= 20){
 		lastDisplay = millis();
+		display.clearBuffer();
+		display.setFont(u8g2_font_6x10_tf);
+		display.setCursor(0, 10);
+		noInterrupts();
+		uint16_t battVoltsRawCp = battVoltsRaw;
+		interrupts();
+		float battVolts = (float)battVoltsRawCp/4096.0*6.6;
+		display.print("Batt:");
+		display.print(battVolts, 1);
+		display.print("V");
 		switch(state){
 			case 255:
-				display.clearBuffer();
-				display.setFont(u8g2_font_ncenB14_tf);
-				display.drawStr(0,15,"Goldfish");
-				display.drawStr(0,32,"Electronrics");
+				display.setFont(u8g2_font_ncenB10_tf);
+				display.drawStr(0,24,"Goldfish");
+				display.drawStr(0,38,"Electronrics");
 				display.setFont(u8g2_font_6x10_tf);
-    		display.drawStr(0,55,"Project 23");
-				display.drawStr(0,63,"Firmware: v0.0.0");
+    		display.drawStr(0,48,"Project 23");
+				display.drawStr(0,58,"Firmware: v0.7.0");
 				break;
 			case 0:
-				display.clearBuffer();
 				display.setFont(u8g2_font_timR10_tr);
-				display.setCursor(0, 11);
+				display.setCursor(0, 22);
 				display.print("Quadrature Encoder:");
-				display.setCursor(0,25);
+				display.setCursor(0,36);
 				display.print("Pos: ");
 				display.print(quadDecoder.getCount());
-				display.setCursor(0,39);
+				display.setCursor(0,50);
 				display.print("Vel: ");
 				display.print(quadDecoder.getVelocity());
 				break;
 			case 1:
-				display.clearBuffer();
 				display.setFont(u8g2_font_timR10_tr);
-				display.setCursor(0, 11);
+				display.setCursor(0, 22);
 				display.print("Analog Encoder:");
-				display.setCursor(0,25);
+				display.setCursor(0,36);
 				display.print("Pos: ");
 				display.print(analogEncoder.getCount());
-				display.setCursor(0,39);
+				display.setCursor(0,50);
 				display.print("Vel: ");
 				display.print(analogEncoder.getVelocity());
 				break;
@@ -174,7 +193,12 @@ void loop(void){
 
 	UIBtn.update();
 	PwrBtn.update();
+	FwdLimit.update();
+	RevLimit.update();
+
 	pwrLed.update();
+	fwdLed.update();
+	revLed.update();
 
 	//ui buttton
 	if(UIBtn.rose()){
@@ -200,11 +224,6 @@ void loop(void){
 
 			}
 		}
-	}
-
-	if(millis() - lastSensorRead >= 1){
-		lastSensorRead = millis();
-		//tick();
 	}
 
 	if(PwrBtn.read() == LOW){

@@ -6,6 +6,8 @@
 
 //sensor port io
 #define TRIGER PA10
+#define FWD_LIMIT PB3
+#define REV_LIMIT PB4
 #define INDEX PA15
 
 //power monitoring and control
