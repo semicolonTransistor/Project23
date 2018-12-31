@@ -29,8 +29,10 @@ uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
 uint32_t lastPwrBtnUp = 0;
 uint8_t state = 255;
+uint8_t battState = 0;
 
 uint16_t battVoltsRaw = 0;
+uint16_t vbusVoltsRaw = 0;
 
 void indexHandler(){
 	quadDecoder.reset();
@@ -40,14 +42,22 @@ void tick(){
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
 	battVoltsRaw = analogRead(BATT_MON);
+	vbusVoltsRaw = analogRead(VBUS_MON);
 }
 
 //shut everything down and prepare for sleep.
 void shutdown(){
-	//clears and shuts down the oled
+	//shuts down power to other circuits
+	digitalWrite(PWR_ENABLE, LOW);
+
+	//disables all interrupts
+	noInterrupts();
 
 	//removes external interrupts
 	detachInterrupt(PA10);
+
+	//stops timers
+	timer_disable_all();
 
 	//shuts down the rest of the stm32
 	adc_disable_all();
@@ -136,15 +146,53 @@ void loop(void){
 	if(millis()-lastDisplay >= 20){
 		lastDisplay = millis();
 		display.clearBuffer();
-		display.setFont(u8g2_font_6x10_tf);
-		display.setCursor(0, 10);
+
+		//Draw battery indicator
 		noInterrupts();
 		uint16_t battVoltsRawCp = battVoltsRaw;
+		uint16_t vbusVoltsRawCp = vbusVoltsRaw;
 		interrupts();
-		float battVolts = (float)battVoltsRawCp/4096.0*6.6;
-		display.print("Batt:");
-		display.print(battVolts, 1);
-		display.print("V");
+
+		Serial.println(battVoltsRawCp);
+		if(battVoltsRawCp >= 2480){
+			battState = 3;
+		}
+
+		if((battState < 2 && battVoltsRawCp >= 2428) || (battState > 2 && battVoltsRawCp <= 2460) ){
+				battState = 2;
+		}
+
+		if((battState < 1 && battVoltsRawCp >= 2376) || (battState > 1 && battVoltsRawCp <= 2408) ){
+				battState = 1;
+		}
+
+		if(battVoltsRawCp <= 2356){
+			battState = 0;
+		}
+
+		if(vbusVoltsRawCp <= 2855){
+			switch (battState) {
+				case 1:
+				display.drawXBM(0, 0, Batt1_width, Batt1_height, Batt1_bits);
+				break;
+
+				case 2:
+				display.drawXBM(0, 0, Batt2_width, Batt2_height, Batt2_bits);
+				break;
+
+				case 3:
+				display.drawXBM(0, 0, Batt3_width, Batt3_height, Batt3_bits);
+				break;
+
+				default:
+				display.drawXBM(0, 0, Batt0_width, Batt0_height, Batt0_bits);
+			}
+		}else{
+			display.drawXBM(0, 0, BattUSB_width, BattUSB_height, BattUSB_bits);
+			//display.setFont(u8g2_font_ncenB08_tf);
+		//display.drawStr(0,10,"USB");
+		}
+
 		switch(state){
 			case 255:
 				display.setFont(u8g2_font_ncenB10_tf);
