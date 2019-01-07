@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <QuadDecoder.h>
 #include <AnalogEncoder.h>
+#include <SupplyReader.h>
 #include <Blinker.h>
 #include <Bounce2.h>
 #include <STM32sleep.h>
@@ -31,14 +32,17 @@ uint32_t lastPwrBtnUp = 0;
 uint8_t state = 255;
 uint8_t battState = 0;
 
-uint16_t battVoltsRaw = 0;
-uint16_t vbusVoltsRaw = 0;
+volatile uint16_t battVoltsRaw = 0;
+volatile uint16_t vbusVoltsRaw = 0;
+volatile uint16_t vccRaw = 0;
 
 void indexHandler(){
 	quadDecoder.reset();
 }
 
 void tick(){
+	supplyReader.processSupply();
+	vccRaw = supplyReader.getRawReading();
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
 	battVoltsRaw = analogRead(BATT_MON);
@@ -96,9 +100,6 @@ void setup(void)	{
 	digitalWrite(PWR_ENABLE, HIGH);
 	digitalWrite(R_DIV_ENABLE, LOW);
 
-	//config exteral interrupts
-	//attachInterrupt(PA10, indexHandler, FALLING
-
 	//setup display and Serial
 	Serial.begin(115200);
 	display.begin();
@@ -129,7 +130,7 @@ void setup(void)	{
 
 	quadDecoder.begin();
 	analogEncoder.begin();
-
+	supplyReader.begin();
 
 	//set up a tick interrupt with a interval of 1 ms.
 	timer_init(TIMER3);
@@ -151,9 +152,8 @@ void loop(void){
 		noInterrupts();
 		uint16_t battVoltsRawCp = battVoltsRaw;
 		uint16_t vbusVoltsRawCp = vbusVoltsRaw;
+		uint16_t vccRawCp = vccRaw;
 		interrupts();
-
-		Serial.println(battVoltsRawCp);
 		if(battVoltsRawCp >= 2480){
 			battState = 3;
 		}
@@ -189,9 +189,14 @@ void loop(void){
 			}
 		}else{
 			display.drawXBM(0, 0, BattUSB_width, BattUSB_height, BattUSB_bits);
-			//display.setFont(u8g2_font_ncenB08_tf);
-		//display.drawStr(0,10,"USB");
 		}
+
+		display.setFont(u8g2_font_ncenB08_tf);
+		display.setCursor(20, 9);
+		display.print(1.2 * (4096.0/(float)vccRawCp));
+		Serial.print(1.2 * (4096.0/(float)vccRawCp));
+		Serial.print(",");
+		Serial.println(vccRawCp);
 
 		switch(state){
 			case 255:
