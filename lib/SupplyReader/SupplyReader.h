@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#define WINDOW_SIZE 10
+
 class SupplyReader{
 public:
   void begin();
@@ -11,7 +13,7 @@ public:
   uint16_t getReading();
 protected:
   uint8_t index;
-  uint16_t samples[256] = {1470};
+  uint16_t samples[WINDOW_SIZE] = {1470};
 };
 
 extern SupplyReader supplyReader;

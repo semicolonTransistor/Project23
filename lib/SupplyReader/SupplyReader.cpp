@@ -11,19 +11,26 @@ void SupplyReader::processSupply(){
   uint16_t sample = adc_read(ADC1, 17);
   samples[index] = sample;
   index ++;
+  if (index >= WINDOW_SIZE){
+    index = 0;
+  }
 }
 
 uint16_t SupplyReader::getRawReading(){
-  return samples[index - 1];
+  int16_t lastIndex = index - 1;
+  if(lastIndex < 0){
+    lastIndex = WINDOW_SIZE - 1;
+  }
+  return samples[lastIndex];
 }
 
 uint16_t SupplyReader::getReading(){
   uint32_t sum = 0;
-  for(uint8_t i = 1; i <= 10; i++){
-    sum += samples[index - i];
+  for(uint8_t i = 0; i < WINDOW_SIZE; i++){
+    sum += samples[i];
   }
 
-  return sum/10;
+  return sum/WINDOW_SIZE;
 }
 
 SupplyReader supplyReader;
