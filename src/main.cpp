@@ -191,11 +191,6 @@ void loop(void){
 			display.drawXBM(0, 0, BattUSB_width, BattUSB_height, BattUSB_bits);
 		}
 
-		display.setFont(u8g2_font_ncenB08_tf);
-		display.setCursor(20, 9);
-		display.print(1.2 * (4096.0/(float)vccRawCp));
-		Serial.print(1.2 * (4096.0/(float)vccRawCp));
-		Serial.print(",");
 		Serial.println(vccRawCp);
 
 		switch(state){
@@ -206,6 +201,12 @@ void loop(void){
 				display.setFont(u8g2_font_6x10_tf);
     		display.drawStr(0,48,"Project 23");
 				display.drawStr(0,58,"Firmware: v0.7.0");
+				break;
+			case 254:
+				display.setFont(u8g2_font_6x10_tf);
+				display.drawStr(0,24,"Error!");
+				display.drawStr(0,34,"Battery Criticaly LOW");
+	    	display.drawStr(0,44,"Please Charge");
 				break;
 			case 0:
 				display.setFont(u8g2_font_timR10_tr);
@@ -242,6 +243,19 @@ void loop(void){
 			Serial.println();
 			lastActivity = millis();
 		}
+
+		if(millis() >= 3000 && state == 255){
+				state = 0;
+		}
+
+		if(vccRawCp >= 1536 && state != 255){
+			state = 254;
+		}
+
+		if(state == 254 && vccRawCp <= 1512 ){
+			state = 0;
+		}
+
 	}
 
 	UIBtn.update();
@@ -255,8 +269,10 @@ void loop(void){
 
 	//ui buttton
 	if(UIBtn.rose()){
-		state++;
 		lastActivity = millis();
+		if(state < 128){
+			state++;
+		}
 		if(state > 1){
 			state = 0;
 		}
@@ -292,6 +308,7 @@ void loop(void){
 	if((millis()-lastActivity) > TIME_OUT){
 		shutdown();
 	}
+
 
 	CLI_Update();
 	delay(2);
