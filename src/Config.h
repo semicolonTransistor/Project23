@@ -4,6 +4,8 @@
 #define TIME_OUT 600000
 #define POWER_DOWN_MIN_DUR 2000
 
+#define INTRO_SCREEN_DURATION 5000
+
 
 
 #endif

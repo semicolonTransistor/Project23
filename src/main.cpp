@@ -195,9 +195,10 @@ void loop(void){
 
 		switch(state){
 			case 255:
-				display.setFont(u8g2_font_ncenB10_tf);
-				display.drawStr(0,24,"Goldfish");
-				display.drawStr(0,38,"Electronrics");
+				display.drawXBM(0, 14, goldfish_logo_width, goldfish_logo_height, goldfish_logo_bits);
+				display.setFont(u8g2_font_ncenB08_tf);
+				display.drawStr(34,24,"Goldfish");
+				display.drawStr(34,38,"Electronrics");
 				display.setFont(u8g2_font_6x10_tf);
     		display.drawStr(0,48,"Project 23");
 				display.drawStr(0,58,"Firmware: v0.7.0");
@@ -244,7 +245,7 @@ void loop(void){
 			lastActivity = millis();
 		}
 
-		if(millis() >= 3000 && state == 255){
+		if(millis() >= INTRO_SCREEN_DURATION && state == 255){
 				state = 0;
 		}
 
@@ -311,6 +312,6 @@ void loop(void){
 
 
 	CLI_Update();
-	delay(2);
+	delay(1);
 
 }
