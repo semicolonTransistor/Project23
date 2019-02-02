@@ -1,6 +1,13 @@
 #include "Blinker.h"
 
-void Blinker::attach(int pinNumber){
+void Blinker::attach(int pinNumber, uint8_t active){
+  activeState = active;
+  if(activeState == LOW){
+    inactiveState = HIGH;
+  }else{
+    inactiveState = LOW;
+  }
+  state = inactiveState;
   pin = pinNumber;
   pinMode(pin, OUTPUT);
 }
@@ -14,26 +21,29 @@ void Blinker::set(BlinkerMode mode){
 }
 
 void Blinker::toggle(){
-  if(state == LOW){
-    digitalWrite(pin, HIGH);
-    state = HIGH;
+  if(state == activeState){
+    digitalWrite(pin, inactiveState);
+    state = inactiveState;
   }else{
-    digitalWrite(pin, LOW);
-    state = LOW;
+    digitalWrite(pin, activeState);
+    state = activeState;
   }
 }
 
 void Blinker::update(){
   switch (mode) {
     case On:
-    digitalWrite(pin, LOW);
-    state = LOW;
+    //turn on the output and sets the current state to on
+    digitalWrite(pin, activeState);
+    state = activeState;
     break;
     case Off:
-    digitalWrite(pin, HIGH);
-    state = HIGH;
+    //turn off the output and sets the current state to off
+    digitalWrite(pin, inactiveState);
+    state = inactiveState;
     break;
     case Blinking:
+    //toggels the output every half period
     if(millis() - lastChange > halfPeriod){
       toggle();
       lastChange = millis();

@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define USB_SERIAL_BAUDRATE 115200          //the baudrate of serial comms.
+
 #define TIME_OUT 600000
 #define POWER_DOWN_MIN_DUR 2000
 

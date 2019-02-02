@@ -119,7 +119,7 @@ void setup(void)	{
 	digitalWrite(R_DIV_ENABLE, LOW);
 
 	//Serial init
-	Serial.begin(115200);
+	Serial.begin(USB_SERIAL_BAUDRATE);
 	CLI_Init();
 
 	//display init
