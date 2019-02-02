@@ -13,33 +13,43 @@
 #include <U8g2lib.h>
 #include "CLI.h"
 
+//ask U8g2 to use a full frame buffer for the display since we have plenty of ram.
 #define USE_FRAME_BUFFER
 
+//Display instantiation
 U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET);
 
+//Debounced inputs instantiation
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
 Bounce RevLimit = Bounce();
 Bounce FwdLimit = Bounce();
 
+//Blink capabale LEDs instantiation
 Blinker pwrLed = Blinker();
 Blinker fwdLed = Blinker();
 Blinker revLed = Blinker();
 
+//variables for tracking time
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
 uint32_t lastPwrBtnUp = 0;
+
+//display state machine.
 uint8_t state = 255;
 uint8_t battState = 0;
 
+//volatiles for passing data from interrupts to main code
 volatile uint16_t battVoltsRaw = 0;
 volatile uint16_t vbusVoltsRaw = 0;
 volatile uint16_t vccRaw = 0;
 
+//interrupt handlerler for encoder index
 void indexHandler(){
 	quadDecoder.reset();
 }
 
+//Timed interrupt for processing sensor inputs, 1kHz
 void tick(){
 	supplyReader.processSupply();
 	vccRaw = supplyReader.getRawReading();
@@ -78,34 +88,46 @@ void shutdown(){
 
 void setup(void)	{
 
-	//config pins
-	PWR_BASE->CSR &= (~PWR_CSR_EWUP); //disables WKUP pin and returns PA0 to GPIO
-	pinMode(UI_BUTTON,INPUT_PULLDOWN);
-	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
-	pinMode(BATT_STAT, INPUT_PULLUP);
+	PWR_BASE->CSR &= (~PWR_CSR_EWUP); 				//disables WKUP pin and returns PA0 to GPIO
 
+	//Buttons
+	pinMode(UI_BUTTON,INPUT_PULLDOWN);				//sets up the UI button as input with pulldown resistor
+	pinMode(PWR_BUTTON, INPUT_PULLDOWN);			//sets up the power button as input with pulldown resistor
+
+	//Sensorport inputs
 	pinMode(INDEX,INPUT_PULLUP);
 	pinMode(FWD_LIMIT, INPUT);
 	pinMode(REV_LIMIT, INPUT);
 
+	//Battery charing stat input setup
+	pinMode(BATT_STAT, INPUT_PULLUP);					//sets up the battery charge stat input as input pullup
+
+	//Internal control outputs setup
 	pinMode(PWR_ENABLE, OUTPUT);
 	pinMode(R_DIV_ENABLE, OUTPUT);
+
+	//LEDs pin setup
 	pinMode(PWR_LED, OUTPUT);
 	pinMode(FWD_LED, OUTPUT);
 	pinMode(REV_LED, OUTPUT);
 
+	//Battery and USB Vbus monitoring setup
 	pinMode(BATT_MON, INPUT_ANALOG);
 	pinMode(VBUS_MON, INPUT_ANALOG);
 
 	digitalWrite(PWR_ENABLE, HIGH);
 	digitalWrite(R_DIV_ENABLE, LOW);
 
-	//setup display and Serial
+	//Serial init
 	Serial.begin(115200);
-	display.begin();
-	display.setBusClock(40000000UL);
 	CLI_Init();
 
+	//display init
+	display.begin();
+	display.setBusClock(32000000UL); //set clockspeed to 32MHz
+
+
+//Debounced inputs init
 	UIBtn.attach(UI_BUTTON);
 	UIBtn.interval(10);
 
@@ -116,8 +138,9 @@ void setup(void)	{
 	FwdLimit.interval(10);
 
 	RevLimit.attach(REV_LIMIT);
-	RevLimit.attach(10);
+	RevLimit.interval(10);
 
+	//Blink capable outputs init
 	pwrLed.attach(PWR_LED);
 	pwrLed.interval(1000);
 	pwrLed.set(BlinkerMode::On);
@@ -128,6 +151,7 @@ void setup(void)	{
 	revLed.attach(REV_LED);
 	revLed.interval(1000);
 
+	//sensor processor init
 	quadDecoder.begin();
 	analogEncoder.begin();
 	supplyReader.begin();
