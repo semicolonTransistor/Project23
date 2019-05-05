@@ -1,30 +1,28 @@
 #include <Arduino.h>
 #include <QuadDecoder.h>
 #include <AnalogEncoder.h>
+#include <Blinker.h>
 #include <Bounce2.h>
 #include <STM32sleep.h>
 
 #include <SPI.h>
-#include "SH1106_SPI.h"
 #include "hardware.h"
+#include "config.h"
+#include <U8g2lib.h>
 #include "CLI.h"
 
 #define USE_FRAME_BUFFER
 
-#ifdef USE_FRAME_BUFFER
-SH1106_SPI_FB lcd;
-#else
-SH1106_SPI lcd;
-#endif
+U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI display(U8G2_R0, PIN_CS, PIN_DC, PIN_RESET);
 
 Bounce UIBtn = Bounce();
 Bounce PwrBtn = Bounce();
-Bounce VBusSense = Bounce();
+Blinker PwrLed = Blinker();
 
 uint32_t lastActivity = 0;
 uint32_t lastDisplay = 0;
 uint32_t lastPwrBtnUp = 0;
-uint32_t displayTime = 0;
+uint32_t lastSensorRead = 0;
 uint8_t state = 0;
 
 void indexHandler(){
@@ -34,20 +32,15 @@ void indexHandler(){
 void tick(){
 	quadDecoder.processDecoder();
 	analogEncoder.processAnalogEncoder();
+
 }
 
 //shut everything down and prepare for sleep.
 void shutdown(){
 	//clears and shuts down the oled
-	lcd.clear(true);
-	digitalWrite(PIN_RESET,LOW);
-	digitalWrite(PIN_CS, LOW);
 
 	//removes external interrupts
 	detachInterrupt(PA10);
-
-	//stops tick timer
-	Timer3.pause();
 
 	//shuts down the rest of the stm32
 	adc_disable_all();
@@ -69,92 +62,88 @@ void setup(void)	{
 	pinMode(UI_BUTTON,INPUT_PULLDOWN);
 	pinMode(PWR_BUTTON, INPUT_PULLDOWN);
 	pinMode(INDEX,INPUT_PULLUP);
-	pinMode(VBUS_SENSE, INPUT_PULLDOWN);
+	pinMode(BATT_STAT, INPUT_PULLUP);
+	pinMode(R_DIV_ENABLE, OUTPUT);
 
-	pinMode(OLED_ENABLE,OUTPUT);
-	pinMode(USB_PULLUP, OUTPUT);
+	pinMode(PWR_ENABLE,OUTPUT);
 	pinMode(PWR_LED,OUTPUT);
-	pinMode(BOOST_EN,OUTPUT);
 
-	digitalWrite(OLED_ENABLE, LOW);
-	digitalWrite(USB_PULLUP, LOW);
-	digitalWrite(PWR_LED,LOW);
-	digitalWrite(BOOST_EN,LOW);
+	pinMode(BATT_MON, INPUT_ANALOG);
+	pinMode(VBUS_MON, INPUT_ANALOG);
+
+	digitalWrite(PWR_ENABLE, HIGH);
+	digitalWrite(R_DIV_ENABLE, LOW);
 
 	//config exteral interrupts
 	//attachInterrupt(PA10, indexHandler, FALLING
 
 	//setup display and Serial
 	Serial.begin(115200);
+	display.begin();
+	display.setBusClock(40000000UL);
 	CLI_Init();
-	lcd.begin(false,true);
 
 	UIBtn.attach(UI_BUTTON);
 	UIBtn.interval(10);
 	PwrBtn.attach(PWR_BUTTON);
 	PwrBtn.interval(10);
-	VBusSense.attach(VBUS_SENSE);
-	VBusSense.interval(100);
+	PwrLed.attach(PWR_LED);
+	PwrLed.interval(1000);
+	PwrLed.set(BlinkerMode::On);
 
 	quadDecoder.begin();
 	analogEncoder.begin();
 
+
 	//set up a tick interrupt with a interval of 1 ms.
-	Timer3.setPeriod(1000);
-	Timer3.setChannel1Mode(TIMER_OUTPUT_COMPARE);
-	Timer3.setCompare1(1);
-	Timer3.attachCompare1Interrupt(tick);
-	Timer3.refresh();
-	Timer3.resume();
+	Timer2.setPeriod(1000);
+	Timer2.setChannel1Mode(TIMER_OUTPUT_COMPARE);
+	Timer2.setCompare1(1);
+	Timer2.attachCompare1Interrupt(tick);
+	Timer2.refresh();
+	Timer2.resume();
 
 }
 
 void loop(void){
 	if(millis()-lastDisplay >= 20){
-		uint32_t dispStart = micros();
-		lcd.clear(false);
 		lastDisplay = millis();
-		int len = 0;
-		switch (state) {
+		switch(state){
+			case 255:
+				display.clearBuffer();
+				display.setFont(u8g2_font_ncenB14_tf);
+				display.drawStr(0,15,"Goldfish");
+				display.drawStr(0,32,"Electronrics");
+				display.setFont(u8g2_font_6x10_tf);
+    		display.drawStr(0,55,"Project 23");
+				display.drawStr(0,63,"Firmware: v0.0.0");
+				break;
 			case 0:
-			len += lcd.print("Encoder:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print(F("Position:"));
-			len += lcd.print(quadDecoder.getCount());
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print(F("Velocity:"));
-			len += lcd.print(quadDecoder.getVelocity());
-			lcd.renderString(0,2,len);
-			break;
+				display.clearBuffer();
+				display.setFont(u8g2_font_timR10_tr);
+				display.setCursor(0, 11);
+				display.print("Quadrature Encoder:");
+				display.setCursor(0,25);
+				display.print("Pos: ");
+				display.print(quadDecoder.getCount());
+				display.setCursor(0,39);
+				display.print("Vel: ");
+				display.print(quadDecoder.getVelocity());
+				break;
 			case 1:
-			len += lcd.print("Encoder:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print((float)(quadDecoder.getCount())/11.37);
-			len += lcd.print(F("deg"));
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print((float)(quadDecoder.getVelocity())/409.6);
-			len += lcd.print(F("rpm"));
-			lcd.renderString(0,2,len);
-			break;
-			case 2:
-			len += lcd.print("Analog:");
-			lcd.renderString(0,0,len);
-			len = 0;
-			len += lcd.print(F("Position:"));
-			len += lcd.print(analogEncoder.getCount());
-			lcd.renderString(0,1,len);
-			len = 0;
-			len += lcd.print(F("Velocity:"));
-			len += lcd.print(analogEncoder.getVelocity());
-			lcd.renderString(0,2,len);
-			break;
+				display.clearBuffer();
+				display.setFont(u8g2_font_timR10_tr);
+				display.setCursor(0, 11);
+				display.print("Analog Encoder:");
+				display.setCursor(0,25);
+				display.print("Pos: ");
+				display.print(analogEncoder.getCount());
+				display.setCursor(0,39);
+				display.print("Vel: ");
+				display.print(analogEncoder.getVelocity());
+				break;
 		}
-		lcd.renderAll();
-		displayTime = micros() - dispStart;
+		display.sendBuffer();
 		if(CLI_Stream){
 			Serial.print(quadDecoder.getCount());
 			Serial.print(",");
@@ -170,13 +159,13 @@ void loop(void){
 
 	UIBtn.update();
 	PwrBtn.update();
-	VBusSense.update();
+	PwrLed.update();
 
 	//ui buttton
 	if(UIBtn.rose()){
 		state++;
 		lastActivity = millis();
-		if(state > 2){
+		if(state > 1){
 			state = 0;
 		}
 	}
@@ -198,16 +187,19 @@ void loop(void){
 		}
 	}
 
+	if(millis() - lastSensorRead >= 1){
+		lastSensorRead = millis();
+		//tick();
+	}
+
 	if(PwrBtn.read() == LOW){
 		lastPwrBtnUp = millis();
 	}
 
-	if(VBusSense.read() == HIGH){
-		digitalWrite(BOOST_EN, LOW);
-		digitalWrite(USB_PULLUP,HIGH);
+	if(digitalRead(BATT_STAT) == LOW){
+		PwrLed.set(BlinkerMode::Blinking);
 	}else{
-		digitalWrite(BOOST_EN, HIGH);
-		digitalWrite(USB_PULLUP,LOW);
+		PwrLed.set(BlinkerMode::On);
 	}
 
 	if((millis()-lastActivity) > TIME_OUT){
@@ -215,5 +207,6 @@ void loop(void){
 	}
 
 	CLI_Update();
+	delay(2);
 
 }
